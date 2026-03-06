@@ -7,6 +7,38 @@
   </head>
   <body class="bg-slate-100">
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div
+      id="boot-error"
+      style="display:none;max-width:920px;margin:24px auto;padding:16px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;font-family:Arial,sans-serif;line-height:1.5;"
+    >
+      <strong>BPMN-lite не загрузился.</strong>
+      <div style="margin-top:8px;">
+        В GitHub Pages сейчас включено <b>«Развертывание из ветки»</b>, из-за этого браузер получает
+        <code>src/main.jsx</code> с MIME <code>text/jsx</code> и показывает белый экран.
+      </div>
+      <ol style="margin:8px 0 0 20px;">
+        <li>Откройте <b>Settings → Pages</b>.</li>
+        <li>В <b>Source</b> выберите <b>GitHub Actions</b>.</li>
+        <li>Дождитесь зелёного workflow <b>Deploy Vite app to GitHub Pages</b> во вкладке Actions.</li>
+      </ol>
+    </div>
+
+    <script>
+      const showBootError = () => {
+        const error = document.getElementById('boot-error');
+        if (error) error.style.display = 'block';
+      };
+
+      window.addEventListener('error', (event) => {
+        const message = String(event?.message || '');
+        if (message.includes('Failed to load module script')) showBootError();
+      });
+
+      window.setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.childElementCount === 0) showBootError();
+      }, 3000);
+    </script>
+    <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>
