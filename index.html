@@ -7,6 +7,23 @@
   </head>
   <body class="bg-slate-100">
     <div id="root"></div>
+    <div id="boot-error" style="display:none;max-width:900px;margin:24px auto;padding:16px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;font-family:Arial,sans-serif;line-height:1.5;">
+      <strong>BPMN-lite не загрузился.</strong>
+      <div style="margin-top:8px;">
+        Вероятная причина: GitHub Pages раздает исходники (<code>src/main.jsx</code>) вместо собранного <code>dist</code>.
+        Проверьте настройки <em>Settings → Pages → Build and deployment → Source = GitHub Actions</em>.
+      </div>
+    </div>
+
+    <script>
+      window.setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.childElementCount === 0) {
+          const error = document.getElementById('boot-error');
+          if (error) error.style.display = 'block';
+        }
+      }, 3000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
