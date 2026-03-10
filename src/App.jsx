@@ -180,6 +180,96 @@ function nextId(prefix, list) {
   return `${prefix}-${next}`;
 }
 
+function escapeXml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function sheetToXml(name, rows) {
+  const tableRows = rows
+    .map(
+      (row) =>
+        `<Row>${row
+          .map((cell) => `<Cell><Data ss:Type="String">${escapeXml(cell ?? '')}</Data></Cell>`)
+          .join('')}</Row>`,
+    )
+    .join('');
+
+  return `<Worksheet ss:Name="${escapeXml(name.slice(0, 31))}"><Table>${tableRows}</Table></Worksheet>`;
+}
+
+function buildExcelXml(state) {
+  const taskByRoleAndStage = new Map(state.tasks.map((task) => [`${task.roleId}::${task.stageId}`, task]));
+  const taskById = new Map(state.tasks.map((task) => [task.id, task]));
+  const stageById = new Map(state.stages.map((stage) => [stage.id, stage]));
+  const roleById = new Map(state.roles.map((role) => [role.id, role]));
+
+  const processRows = [
+    ['Роль / Этап', ...state.stages.map((stage) => stage.title)],
+    ...state.roles.map((role) => [
+      role.title,
+      ...state.stages.map((stage) => taskByRoleAndStage.get(`${role.id}::${stage.id}`)?.text || ''),
+    ]),
+    [state.footer.product.title, ...state.stages.map((stage) => state.footer.product.values[stage.id] || '')],
+    [state.footer.methodology.title, ...state.stages.map((stage) => state.footer.methodology.values[stage.id] || '')],
+  ];
+
+  const edgeRows = [
+    [
+      'ID связи',
+      'От (ID задачи)',
+      'От (текст задачи)',
+      'К (ID задачи)',
+      'К (текст задачи)',
+      'Источник (роль)',
+      'Источник (этап)',
+      'Цель (роль)',
+      'Цель (этап)',
+      'Цвет',
+      'Тип линии',
+      'Якорь source',
+      'Якорь target',
+    ],
+    ...state.edges.map((edge) => {
+      const sourceTask = taskById.get(edge.sourceTaskId);
+      const targetTask = taskById.get(edge.targetTaskId);
+      return [
+        edge.id,
+        edge.sourceTaskId,
+        sourceTask?.text || '',
+        edge.targetTaskId,
+        targetTask?.text || '',
+        roleById.get(sourceTask?.roleId || '')?.title || '',
+        stageById.get(sourceTask?.stageId || '')?.title || '',
+        roleById.get(targetTask?.roleId || '')?.title || '',
+        stageById.get(targetTask?.stageId || '')?.title || '',
+        edge.color || '',
+        edge.lineType || 'smoothstep',
+        edge.sourceAnchor || 'right',
+        edge.targetAnchor || 'left',
+      ];
+    }),
+  ];
+
+  const xmlPayload = JSON.stringify(state, null, 2);
+
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+${sheetToXml('Схема процесса', processRows)}
+${sheetToXml('Связи', edgeRows)}
+${sheetToXml('Полный JSON', [['JSON состояния'], [xmlPayload]])}
+</Workbook>`;
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'add-stage': {
@@ -395,12 +485,12 @@ function App() {
   );
 
   const handleExport = () => {
-    const payload = JSON.stringify(state, null, 2);
-    const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+    const payload = buildExcelXml(state);
+    const blob = new Blob([payload], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'bpmn-lite-process.json';
+    link.download = 'bpmn-lite-process.xls';
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -413,7 +503,7 @@ function App() {
           <button className="rounded bg-indigo-500 px-3 py-2 text-sm font-medium text-white" onClick={() => dispatch({ type: 'remove-stage' })}>Удалить этап</button>
           <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white" onClick={() => dispatch({ type: 'add-role' })}>Добавить роль</button>
           <button className="rounded bg-emerald-500 px-3 py-2 text-sm font-medium text-white" onClick={() => dispatch({ type: 'remove-role' })}>Удалить роль</button>
-          <button className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white" onClick={handleExport}>Выгрузить JSON</button>
+          <button className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white" onClick={handleExport}>Выгрузить Excel</button>
         </div>
 
         <div className="grid gap-2 md:grid-cols-7">
